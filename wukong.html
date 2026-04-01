@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wukong: Gorilla Vô Tận - Ultimate Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050510;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: #0d1117;
+            image-rendering: pixelated;
+            border: 4px solid #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            color: #ffd700;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .bar-container {
+            width: 220px;
+            height: 18px;
+            background: #111;
+            border: 2px solid #ffd700;
+            margin-top: 8px;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #900, #f22);
+            transition: width 0.1s;
+        }
+
+        #skill-ui {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            padding: 10px;
+            background: rgba(0,0,0,0.8);
+            border-radius: 12px;
+            border: 1px solid #ffd700;
+        }
+
+        .skill-box {
+            width: 60px;
+            height: 60px;
+            background: #1a1a1a;
+            border: 2px solid #444;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            font-size: 7px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .skill-cooldown {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            background: rgba(255, 215, 0, 0.6);
+            z-index: 2;
+            transition: height 0.1s linear;
+        }
+
+        .skill-key {
+            font-size: 14px;
+            color: #ffd700;
+            z-index: 3;
+        }
+
+        #boss-ui {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: none;
+            text-align: right;
+            color: #ff4444;
+        }
+
+        #menu {
+            position: absolute;
+            background: rgba(0,0,0,0.95);
+            padding: 50px;
+            border: 4px solid #ffd700;
+            text-align: center;
+            z-index: 100;
+            color: white;
+        }
+
+        button {
+            padding: 15px 40px;
+            font-family: 'Press Start 2P', cursive;
+            background: #ffd700;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        .controls-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 7px;
+            color: #888;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui-layer">
+        <div id="player-name">WUKONG</div>
+        <div class="bar-container">
+            <div id="hp-bar" class="bar-fill"></div>
+        </div>
+        <div id="distance-ui" style="margin-top: 10px; font-size: 10px;">KM: 0</div>
+    </div>
+
+    <div id="skill-ui">
+        <div class="skill-box"><span class="skill-key">F</span><span>ĐÁNH</span></div>
+        <div class="skill-box"><div class="skill-cooldown" id="cd-j"></div><span class="skill-key">J</span><span>GẬY</span></div>
+        <div class="skill-box"><div class="skill-cooldown" id="cd-k"></div><span class="skill-key">K</span><span>ĐỊNH</span></div>
+        <div class="skill-box"><div class="skill-cooldown" id="cd-l"></div><span class="skill-key">L</span><span>THÂN</span></div>
+        <div class="skill-box"><div class="skill-cooldown" id="cd-t"></div><span class="skill-key">T</span><span>TRỌNG</span></div>
+        <div class="skill-box"><div class="skill-cooldown" id="cd-o"></div><span class="skill-key">O</span><span>GORILLA</span></div>
+    </div>
+
+    <div id="boss-ui">
+        <div id="boss-name">TRÙM CUỐI</div>
+        <div class="bar-container">
+            <div id="boss-hp-fill" class="bar-fill" style="background: #f0f;"></div>
+        </div>
+    </div>
+
+    <div id="menu">
+        <h1 style="color: #ffd700;">TRỌNG BLACK: WUKONG</h1>
+        <p style="font-size: 10px;">BẢN CẬP NHẬT: FULL KỸ NĂNG & THỜI TIẾT</p>
+        <button id="start-btn">BẮT ĐẦU THÔI</button>
+    </div>
+
+    <div class="controls-hint">
+        AD: DI CHUYỂN | SPACE: NHẢY | F: ĐÁNH<br>
+        J: PHÓNG GẬY | K: ĐỊNH THÂN | L: PHÂN THÂN | T: TRỌNG THIÊN | O: DA DEN
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // ĐƯỜNG DẪN HÌNH ẢNH
+    // ==========================================
+    const URL_PLAYER = "trong.jpg"; 
+    const URL_BOSS   = "boss2.jpg"; 
+    const URL_ENEMY  = "boss3.jpg"; 
+    const URL_CROW   = ""; 
+    // ==========================================
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('start-btn');
+    const menu = document.getElementById('menu');
+    const hpBar = document.getElementById('hp-bar');
+    const bossUi = document.getElementById('boss-ui');
+    const bossHpFill = document.getElementById('boss-hp-fill');
+    const distanceUi = document.getElementById('distance-ui');
+
+    canvas.width = 800;
+    canvas.height = 450;
+
+    const imgP = new Image(); if(URL_PLAYER) imgP.src = URL_PLAYER;
+    const imgB = new Image(); if(URL_BOSS) imgB.src = URL_BOSS;
+    const imgE = new Image(); if(URL_ENEMY) imgE.src = URL_ENEMY;
+    const imgC = new Image(); if(URL_CROW) imgC.src = URL_CROW;
+
+    const gravity = 0.65;
+    let gameRunning = false;
+    let scrollOffset = 0;
+    let lastGeneratedX = 1000;
+    let totalDistance = 0;
+    let shakeTimer = 0;
+    let lightningTimer = 0;
+    const keys = { a: false, d: false };
+
+    class Crow {
+        constructor() {
+            this.x = Math.random() * canvas.width + 800;
+            this.y = Math.random() * 150;
+            this.speed = Math.random() * 2 + 3;
+            this.wing = 0;
+        }
+        update() {
+            this.x -= this.speed;
+            this.wing += 0.2;
+            if(this.x < -100) {
+                this.x = canvas.width + 200;
+                this.y = Math.random() * 150;
+            }
+        }
+        draw() {
+            ctx.save();
+            if(imgC.complete && URL_CROW) {
+                ctx.drawImage(imgC, this.x, this.y, 30, 30);
+            } else {
+                ctx.strokeStyle = "black";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.quadraticCurveTo(this.x + 10, this.y + Math.sin(this.wing) * 10, this.x + 20, this.y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+    }
+
+    class Cloud {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * 120;
+            this.w = Math.random() * 100 + 100;
+            this.speed = Math.random() * 0.5 + 0.2;
+        }
+        draw() {
+            ctx.fillStyle = "rgba(100, 100, 120, 0.3)";
+            ctx.beginPath();
+            ctx.ellipse(this.x, this.y, this.w, this.w/3, 0, 0, Math.PI*2);
+            ctx.fill();
+            this.x -= this.speed;
+            if(this.x + this.w < 0) this.x = canvas.width + this.w;
+        }
+    }
+
+    class Player {
+        constructor() {
+            this.pos = { x: 100, y: 100 };
+            this.vel = { x: 0, y: 0 };
+            this.width = 40; this.height = 55;
+            this.hp = 100; this.maxHp = 100;
+            this.isJumping = false;
+            this.dir = 1;
+            this.isGorilla = false;
+            this.atkTimer = 0;
+            this.skillActive = { j: false, k: false, l: false };
+            this.cooldowns = { j: 0, k: 0, l: 0, t: 0, o: 0 };
+            this.maxCD = { j: 100, k: 300, l: 200, t: 150, o: 1000 };
+        }
+
+        draw() {
+            ctx.save();
+            let drawX = this.pos.x - scrollOffset;
+            let drawY = this.pos.y;
+
+            if(this.skillActive.l) {
+                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = "cyan";
+                ctx.fillRect(drawX - 30, drawY, this.width, this.height);
+                ctx.fillRect(drawX + 30, drawY, this.width, this.height);
+                ctx.globalAlpha = 1.0;
+            }
+
+            ctx.translate(drawX + this.width/2, drawY + this.height/2);
+            if(this.dir === -1) ctx.scale(-1, 1);
+
+            if(this.isGorilla) {
+                ctx.fillStyle = "#222"; ctx.fillRect(-50, -50, 100, 100);
+                ctx.fillStyle = "red"; ctx.fillRect(-20, -75, 10, 10); ctx.fillRect(10, -75, 10, 10);
+                if(this.atkTimer > 0) { ctx.fillStyle = "#444"; ctx.fillRect(40, -40, 80, 50); }
+            } else {
+                if(imgP.complete && URL_PLAYER) {
+                    ctx.drawImage(imgP, -this.width/2, -this.height/2, this.width, this.height);
+                } else {
+                    ctx.fillStyle = "#ff5722"; ctx.fillRect(-15, -5, 30, 35); 
+                    ctx.fillStyle = "#ffe0b2"; ctx.beginPath(); ctx.arc(0, -20, 18, 0, Math.PI*2); ctx.fill();
+                }
+                
+                ctx.fillStyle = this.skillActive.j ? "#ff0000" : "#ffd700";
+                let gậyW = this.skillActive.j ? 150 : 45;
+                if(this.atkTimer > 0) {
+                    ctx.rotate(Math.PI/4); ctx.fillRect(10, -gậyW, 8, gậyW*2);
+                } else {
+                    ctx.fillRect(15, -15, 5, 45);
+                }
+            }
+            ctx.restore();
+        }
+
+        update() {
+            if (keys.a) { this.vel.x = -8; this.dir = -1; }
+            else if (keys.d) { this.vel.x = 8; this.dir = 1; }
+            else { this.vel.x = 0; }
+
+            this.pos.x += this.vel.x;
+            this.pos.y += this.vel.y;
+            if(this.atkTimer > 0) this.atkTimer--;
+
+            // SỬA LỖI NHẢY LÊN VÁCH: Tăng độ chính xác khi va chạm nền tảng
+            let onPlatform = false;
+            platforms.forEach(p => {
+                // Kiểm tra nếu chân nhân vật nằm trong phạm vi bề mặt nền tảng
+                if (this.pos.x + this.width * 0.8 > p.x && 
+                    this.pos.x + this.width * 0.2 < p.x + p.w &&
+                    this.pos.y + this.height <= p.y + 10 && 
+                    this.pos.y + this.height + this.vel.y >= p.y) {
+                    
+                    this.vel.y = 0; 
+                    this.pos.y = p.y - this.height; 
+                    onPlatform = true;
+                }
+            });
+
+            if(!onPlatform) {
+                this.vel.y += gravity; 
+            } else { 
+                this.isJumping = false; 
+                this.vel.y = 0; 
+            }
+
+            if(this.pos.y > canvas.height + 50) endGame();
+
+            for(let key in this.cooldowns) {
+                if(this.cooldowns[key] > 0) {
+                    this.cooldowns[key]--;
+                    let el = document.getElementById(`cd-${key}`);
+                    if(el) el.style.height = (this.cooldowns[key] / this.maxCD[key] * 100) + "%";
+                }
+            }
+        }
+
+        useSkill(skill) {
+            if(this.cooldowns[skill] > 0) return;
+
+            switch(skill) {
+                case 'j': 
+                    this.skillActive.j = true;
+                    this.atkTimer = 20;
+                    this.checkAttack(180, 150);
+                    setTimeout(() => this.skillActive.j = false, 500);
+                    break;
+                case 'k': 
+                    this.skillActive.k = true;
+                    shakeTimer = 10;
+                    enemies.forEach(en => {
+                        if(Math.abs(this.pos.x - en.pos.x) < 500) en.isFrozen = 90;
+                    });
+                    break;
+                case 'l': 
+                    this.skillActive.l = true;
+                    setTimeout(() => this.skillActive.l = false, 3000);
+                    break;
+                case 't': 
+                    this.vel.y = -24;
+                    this.isJumping = true;
+                    shakeTimer = 8;
+                    break;
+                case 'o': 
+                    this.transform();
+                    break;
+            }
+            this.cooldowns[skill] = this.maxCD[skill];
+        }
+
+        checkAttack(range, damage) {
+            enemies.forEach(en => {
+                if(en.alive && Math.abs(this.pos.x - en.pos.x) < range) {
+                    en.hp -= damage;
+                    en.vel.x = this.dir * 20;
+                    if(en.hp <= 0) en.alive = false;
+                }
+            });
+        }
+
+        transform() {
+            this.isGorilla = true;
+            this.width = 130; this.height = 150;
+            this.pos.y -= 100;
+            this.hp = 1000; this.maxHp = 1000;
+            setTimeout(() => {
+                this.isGorilla = false;
+                this.width = 40; this.height = 55;
+                this.maxHp = 100; this.hp = 100;
+                hpBar.style.width = "100%";
+            }, 10000);
+        }
+    }
+
+    class Enemy {
+        constructor(x, y, isBoss = false) {
+            this.pos = { x, y }; this.vel = { x: 0, y: 0 };
+            this.isBoss = isBoss; this.width = isBoss ? 120 : 45; this.height = isBoss ? 140 : 60;
+            this.hp = isBoss ? 2500 : 100; this.maxHp = this.hp;
+            this.alive = true; this.isFrozen = 0;
+            this.atkCooldown = 0;
+        }
+        draw() {
+            if(!this.alive) return;
+            let dx = this.pos.x - scrollOffset;
+            if(this.isFrozen > 0) { ctx.shadowBlur = 15; ctx.shadowColor = "cyan"; }
+            
+            let img = this.isBoss ? imgB : imgE;
+            if(img.complete && (this.isBoss ? URL_BOSS : URL_ENEMY)) {
+                ctx.drawImage(img, dx, this.pos.y, this.width, this.height);
+            } else {
+                ctx.fillStyle = this.isBoss ? "#4b0082" : "#2f4f4f";
+                ctx.fillRect(dx, this.pos.y, this.width, this.height);
+            }
+            ctx.shadowBlur = 0;
+        }
+        update(pPos) {
+            if(!this.alive) return;
+            if(this.isFrozen > 0) { this.isFrozen--; return; }
+
+            let onPlatform = false;
+            platforms.forEach(p => {
+                if (this.pos.x + this.width > p.x && this.pos.x < p.x + p.w &&
+                    this.pos.y + this.height <= p.y + 10 && this.pos.y + this.height + this.vel.y >= p.y) {
+                    this.vel.y = 0; this.pos.y = p.y - this.height; onPlatform = true;
+                }
+            });
+            if(!onPlatform) this.vel.y += gravity;
+            this.pos.y += this.vel.y;
+
+            // AI di chuyển
+            let dist = Math.abs(this.pos.x - pPos.x);
+            if(dist < 600) {
+                this.pos.x += (this.pos.x > pPos.x ? -2.5 : 2.5);
+            }
+            
+            if(this.atkCooldown > 0) this.atkCooldown--;
+            if(this.pos.y > canvas.height + 200) this.alive = false;
+        }
+    }
+
+    class Platform {
+        constructor(x, y, w, h) { this.x = x; this.y = y; this.w = w; this.h = h; }
+        draw() {
+            ctx.fillStyle = "#1a0f0d"; ctx.fillRect(this.x - scrollOffset, this.y, this.w, this.h);
+            ctx.fillStyle = "#3d2b1f"; ctx.fillRect(this.x - scrollOffset, this.y, this.w, 8);
+        }
+    }
+
+    let player = new Player();
+    let platforms = [], enemies = [], clouds = [], crows = [];
+
+    function init() {
+        platforms = [new Platform(0, 380, 1000, 100), new Platform(1200, 320, 800, 100)];
+        enemies = [new Enemy(800, 200), new Enemy(1500, 150, true)]; // Luôn có 1 boss lúc đầu
+        for(let i=0; i<6; i++) clouds.push(new Cloud());
+        for(let i=0; i<4; i++) crows.push(new Crow());
+        lastGeneratedX = 2000;
+    }
+
+    function endGame() { 
+        gameRunning = false; 
+        setTimeout(() => {
+            alert("GAME OVER, HÃY TU LUYỆN THÊM!"); 
+            location.reload(); 
+        }, 100);
+    }
+
+    function animate() {
+        if(!gameRunning) return;
+        requestAnimationFrame(animate);
+        ctx.save();
+        if(shakeTimer > 0) { ctx.translate(Math.random()*8-4, Math.random()*8-4); shakeTimer--; }
+
+        ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        if(Math.random() > 0.996) lightningTimer = 4;
+        if(lightningTimer > 0) { ctx.fillStyle = "rgba(255, 255, 255, 0.2)"; ctx.fillRect(0,0, canvas.width, canvas.height); lightningTimer--; }
+
+        clouds.forEach(c => c.draw());
+        crows.forEach(c => { c.update(); c.draw(); });
+
+        player.update();
+        player.draw();
+
+        // Tạo bản đồ vô tận với tỷ lệ Boss cao hơn
+        if(player.pos.x + 1200 > lastGeneratedX) {
+            let w = Math.random()*500 + 500; 
+            let nx = lastGeneratedX + Math.random()*120 + 120; 
+            let ny = Math.random()*120 + 260;
+            platforms.push(new Platform(nx, ny, w, 100));
+            
+            // Tỷ lệ Boss 30% để không bị "mất Boss"
+            let isBoss = Math.random() > 0.7;
+            enemies.push(new Enemy(nx + 200, ny - 150, isBoss));
+            
+            lastGeneratedX = nx + w;
+        }
+
+        platforms.forEach(p => p.draw());
+        
+        let bossVisible = false;
+        enemies.forEach(en => {
+            if(!en.alive) return;
+            en.update(player.pos);
+            en.draw();
+
+            // Hiển thị thanh máu Boss khi ở gần
+            if(en.isBoss && Math.abs(player.pos.x - en.pos.x) < 900) {
+                bossVisible = true; 
+                bossUi.style.display = "block";
+                bossHpFill.style.width = (en.hp/en.maxHp)*100 + "%";
+                document.getElementById('boss-name').innerText = "TRÙM CUỐI";
+            }
+
+            // Va chạm gây sát thương (QUÁI ĐÁNH YẾU LẠI)
+            let pRangeX = player.isGorilla ? 80 : 30;
+            let pRangeY = player.isGorilla ? 100 : 50;
+            if(Math.abs(player.pos.x - en.pos.x) < pRangeX && Math.abs(player.pos.y - en.pos.y) < pRangeY) {
+                if(en.atkCooldown <= 0) {
+                    // Sát thương quái thường: 3, Boss: 8 (giảm mạnh)
+                    let dmg = en.isBoss ? 8 : 3;
+                    if(player.isGorilla) dmg = 0.5; // Gorilla gần như bất tử
+                    
+                    player.hp -= dmg;
+                    en.atkCooldown = 40; // Giãn cách đòn đánh của quái
+                    hpBar.style.width = (player.hp/player.maxHp)*100 + "%";
+                    
+                    if(player.hp <= 0) endGame();
+                }
+            }
+        });
+        if(!bossVisible) bossUi.style.display = "none";
+
+        scrollOffset += (player.pos.x - 300 - scrollOffset) * 0.08;
+        totalDistance = Math.max(totalDistance, player.pos.x);
+        distanceUi.innerText = `KM: ${(totalDistance/100).toFixed(1)}`;
+        ctx.restore();
+    }
+
+    window.addEventListener('keydown', e => {
+        let k = e.key.toLowerCase();
+        if(k === 'a') keys.a = true;
+        if(k === 'd') keys.d = true;
+        if(e.code === 'Space' && !player.isJumping) { 
+            player.vel.y = -18; 
+            player.isJumping = true; 
+        }
+        if(k === 'f') { 
+            player.atkTimer = 10; 
+            player.checkAttack(player.isGorilla ? 220 : 100, player.isGorilla ? 150 : 35); 
+        }
+        
+        if(['j','k','l','t','o'].includes(k)) player.useSkill(k);
+    });
+
+    window.addEventListener('keyup', e => {
+        let k = e.key.toLowerCase();
+        if(k === 'a') keys.a = false;
+        if(k === 'd') keys.d = false;
+    });
+
+    startBtn.addEventListener('click', () => { 
+        menu.style.display = "none"; 
+        gameRunning = true; 
+        init(); 
+        animate(); 
+    });
+</script>
+</body>
+</html>

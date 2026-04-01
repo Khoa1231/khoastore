@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giao Diện Nghe Nhạc Chuyên Nghiệp</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #ff2a6d;
+            --secondary-color: #05d9e8;
+            --text-color: #ffffff;
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #0a0a0a;
+            /* Hình nền sẽ được cập nhật bằng JavaScript để khớp với ảnh đĩa nhạc */
+            background-size: cover;
+            background-position: center;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+            overflow: hidden;
+            transition: background-image 0.8s ease-in-out;
+        }
+
+        /* Lớp phủ mờ cho hình nền để làm nổi bật trình phát */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1;
+        }
+
+        .player-container {
+            position: relative;
+            width: 380px;
+            padding: 40px 30px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.5);
+            text-align: center;
+            z-index: 10;
+        }
+
+        /* Hiệu ứng đĩa xoay */
+        .cd-area {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .cd {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background-image: url('https://via.placeholder.com/200?text=CD+Cover');
+            background-size: cover;
+            background-position: center;
+            border: 8px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            position: relative;
+            animation: rotate 20s linear infinite;
+            animation-play-state: paused;
+        }
+
+        .cd::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: #0a0a0a;
+            border-radius: 50%;
+            border: 5px solid var(--glass-border);
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Thông tin bài hát */
+        .song-info h2 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .song-info p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 25px;
+        }
+
+        /* Thanh thời gian */
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .progress {
+            height: 100%;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            border-radius: 10px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .time-box {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            margin-bottom: 30px;
+        }
+
+        /* Bộ điều khiển */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            opacity: 0.8;
+        }
+
+        .btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+            color: var(--secondary-color);
+        }
+
+        .btn-play {
+            width: 65px;
+            height: 65px;
+            background: white;
+            color: #000;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .btn-play:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .active {
+            color: var(--primary-color) !important;
+            opacity: 1;
+        }
+
+        /* Danh sách bài hát */
+        .playlist-info {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="player-container">
+        <div class="cd-area">
+            <div class="cd" id="cd-thumb"></div>
+        </div>
+
+        <div class="song-info">
+            <h2 id="title">Tên bài hát</h2>
+            <p id="author">Ca sĩ</p>
+        </div>
+
+        <div class="progress-container" id="progress-container">
+            <div class="progress" id="progress"></div>
+        </div>
+        
+        <div class="time-box">
+            <span id="current-time">0:00</span>
+            <span id="duration">0:00</span>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="repeat">
+                <i class="fas fa-redo"></i>
+            </button>
+            <button class="btn" id="prev">
+                <i class="fas fa-step-backward"></i>
+            </button>
+            <button class="btn btn-play" id="play">
+                <i class="fas fa-play" id="play-icon"></i>
+            </button>
+            <button class="btn" id="next">
+                <i class="fas fa-step-forward"></i>
+            </button>
+            <button class="btn" id="random">
+                <i class="fas fa-random"></i>
+            </button>
+        </div>
+
+        <div class="playlist-info">
+            Đang phát <span id="song-index">1</span>/3
+        </div>
+    </div>
+
+    <!-- Audio Tag -->
+    <audio id="audio" src=""></audio>
+
+    <script>
+        const audio = document.getElementById('audio');
+        const playBtn = document.getElementById('play');
+        const playIcon = document.getElementById('play-icon');
+        const prevBtn = document.getElementById('prev');
+        const nextBtn = document.getElementById('next');
+        const progress = document.getElementById('progress');
+        const progressContainer = document.getElementById('progress-container');
+        const title = document.getElementById('title');
+        const author = document.getElementById('author');
+        const cdThumb = document.getElementById('cd-thumb');
+        const currentTimeEl = document.getElementById('current-time');
+        const durationEl = document.getElementById('duration');
+        const songIndexEl = document.getElementById('song-index');
+        const randomBtn = document.getElementById('random');
+        const repeatBtn = document.getElementById('repeat');
+        const body = document.body;
+
+        // --- CẤU HÌNH NHẠC TẠI ĐÂY ---
+        const songs = [
+            {
+                name: 'GIÓ SÓNG',
+                singer: 'Ca sĩ ',
+                path: 'gio.mp3', 
+                image: 'huy.png' 
+            },
+            {
+                name: 'BACK TO HOME',
+                singer: 'Ca sĩ ',
+                path: 'sol7.mp3', 
+                image: 'gang.jpg' 
+            },
+            {
+                name: 'TẤM LÒNG CỬU LONG',
+                singer: 'Ca sĩ ',
+                path: 'sep.mp3', 
+                image: 'khoa.jpg' 
+            }
+        ];
+
+        let isPlaying = false;
+        let songIndex = 0;
+        let isRandom = false;
+        let isRepeat = false;
+
+        // Tải thông tin bài hát và cập nhật hình nền
+        function loadSong(song) {
+            title.innerText = song.name;
+            author.innerText = song.singer;
+            audio.src = song.path;
+            
+            // Cập nhật ảnh đĩa nhạc
+            cdThumb.style.backgroundImage = `url('${song.image}')`;
+            
+            // Cập nhật hình nền trang web đồng bộ với ảnh bài hát
+            body.style.backgroundImage = `url('${song.image}')`;
+            
+            songIndexEl.innerText = songIndex + 1;
+        }
+
+        // Phát nhạc
+        function playSong() {
+            isPlaying = true;
+            playIcon.classList.replace('fa-play', 'fa-pause');
+            cdThumb.style.animationPlayState = 'running';
+            audio.play();
+        }
+
+        // Tạm dừng
+        function pauseSong() {
+            isPlaying = false;
+            playIcon.classList.replace('fa-pause', 'fa-play');
+            cdThumb.style.animationPlayState = 'paused';
+            audio.pause();
+        }
+
+        // Xử lý khi bấm nút Play/Pause
+        playBtn.addEventListener('click', () => {
+            isPlaying ? pauseSong() : playSong();
+        });
+
+        // Đổi bài hát
+        function nextSong() {
+            if (isRandom) {
+                let newIndex;
+                do {
+                    newIndex = Math.floor(Math.random() * songs.length);
+                } while (newIndex === songIndex);
+                songIndex = newIndex;
+            } else {
+                songIndex++;
+                if (songIndex > songs.length - 1) songIndex = 0;
+            }
+            loadSong(songs[songIndex]);
+            if (isPlaying) playSong();
+        }
+
+        function prevSong() {
+            songIndex--;
+            if (songIndex < 0) songIndex = songs.length - 1;
+            loadSong(songs[songIndex]);
+            if (isPlaying) playSong();
+        }
+
+        nextBtn.addEventListener('click', nextSong);
+        prevBtn.addEventListener('click', prevSong);
+
+        // Cập nhật thanh tiến trình
+        audio.addEventListener('timeupdate', (e) => {
+            const { duration, currentTime } = e.srcElement;
+            const progressPercent = (currentTime / duration) * 100;
+            progress.style.width = `${progressPercent}%`;
+
+            let curMins = Math.floor(currentTime / 60);
+            let curSecs = Math.floor(currentTime % 60);
+            if (curSecs < 10) curSecs = `0${curSecs}`;
+            currentTimeEl.innerText = `${curMins}:${curSecs}`;
+
+            if (duration) {
+                let durMins = Math.floor(duration / 60);
+                let durSecs = Math.floor(duration % 60);
+                if (durSecs < 10) durSecs = `0${durSecs}`;
+                durationEl.innerText = `${durMins}:${durSecs}`;
+            }
+        });
+
+        // Nhảy thời gian khi click vào thanh progress
+        progressContainer.addEventListener('click', (e) => {
+            const width = progressContainer.clientWidth;
+            const clickX = e.offsetX;
+            const duration = audio.duration;
+            audio.currentTime = (clickX / width) * duration;
+        });
+
+        // Xử lý khi kết thúc bài hát
+        audio.addEventListener('ended', () => {
+            if (isRepeat) {
+                playSong();
+            } else {
+                nextSong();
+            }
+        });
+
+        // Random mode
+        randomBtn.addEventListener('click', () => {
+            isRandom = !isRandom;
+            randomBtn.classList.toggle('active', isRandom);
+        });
+
+        // Repeat mode
+        repeatBtn.addEventListener('click', () => {
+            isRepeat = !isRepeat;
+            repeatBtn.classList.toggle('active', isRepeat);
+        });
+
+        // Khởi tạo bài đầu tiên
+        loadSong(songs[songIndex]);
+
+    </script>
+</body>
+</html>

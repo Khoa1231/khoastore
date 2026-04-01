@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Fishing - Khoa Khang Lợi Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: 'Press Start 2P', cursive;
+            image-rendering: pixelated;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw; height: 100vh;
+            background: #aaddff;
+            transition: background 1s ease-in-out;
+        }
+
+        canvas { display: block; }
+
+        .ui-overlay {
+            position: absolute; top: 20px; left: 20px;
+            color: white; text-shadow: 2px 2px #000;
+            pointer-events: none; z-index: 50;
+        }
+
+        .btn {
+            pointer-events: auto; background: #e67e22; border: 4px solid #d35400;
+            padding: 10px 15px; color: white; cursor: pointer; font-size: 8px;
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.9); }
+        .btn-shop { background: #9b59b6; border-color: #8e44ad; }
+
+        #combo-container {
+            position: absolute; top: 40%; left: 50%;
+            transform: translateX(-50%); display: none;
+            flex-direction: row; gap: 10px; z-index: 100;
+        }
+
+        .combo-key {
+            width: 45px; height: 45px; background: white; border: 4px solid #333;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; color: #333; border-radius: 4px;
+        }
+
+        .combo-key.active { background: #2ecc71; color: white; transform: scale(1.1); }
+
+        /* Modal UI */
+        .modal-custom {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 90%; max-width: 800px;
+            height: 85%; background: #f1c40f; border: 8px solid #f39c12;
+            display: none; flex-direction: column; padding: 20px;
+            z-index: 150; overflow-y: auto; box-shadow: 0 0 0 1000px rgba(0,0,0,0.7);
+        }
+
+        /* Collection Grid Update */
+        .fish-grid {
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 10px; 
+            margin-top: 20px;
+        }
+
+        .fish-card {
+            border: 4px solid rgba(0,0,0,0.15);
+            padding: 12px 8px; 
+            text-align: center; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+            justify-content: space-between;
+            min-height: 140px;
+            border-radius: 4px;
+        }
+
+        .fish-card.locked { opacity: 0.6; filter: grayscale(0.6); }
+
+        /* Rarity Backgrounds */
+        .rarity-1 { background-color: #bdc3c7; }
+        .rarity-2 { background-color: #5dade2; }
+        .rarity-3 { background-color: #a569bd; }
+        .rarity-4 { background-color: #f4d03f; }
+        .rarity-5 { 
+            background: linear-gradient(45deg, #ff9a9e, #fad0c4, #fbc2eb, #a18cd1, #84fab0, #8fd3f4);
+            background-size: 300% 300%;
+            animation: rainbow 4s ease infinite;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        @keyframes rainbow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .fish-name { font-size: 7px; margin-top: 5px; font-weight: bold; color: #000; }
+        .fish-rare-tag { font-size: 5px; margin-top: 3px; opacity: 0.8; text-transform: uppercase; color: #333; }
+
+        /* Shop UI */
+        .item-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px; margin-top: 20px;
+        }
+
+        .item-card {
+            background: rgba(255,255,255,0.3); border: 4px solid rgba(0,0,0,0.1);
+            padding: 10px; text-align: center; font-size: 8px;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+
+        #catch-modal {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: white; border: 8px solid #3498db;
+            padding: 30px; text-align: center; z-index: 200;
+            transition: transform 0.3s;
+        }
+
+        #catch-modal.show { transform: translate(-50%, -50%) scale(1); }
+
+        #notification {
+            position: absolute; top: 120px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); border: 2px solid #fff; color: #fff;
+            padding: 10px 20px; font-size: 10px; display: none; z-index: 60;
+            text-align: center;
+        }
+
+        .active-buffs {
+            position: absolute; top: 20px; right: 20px;
+            text-align: right; pointer-events: none; z-index: 50;
+            font-size: 8px; color: #fff; text-shadow: 1px 1px #000;
+        }
+
+        .tsunami {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 0;
+            background: rgba(20, 50, 150, 0.4); z-index: 45; pointer-events: none;
+            transition: height 1s;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="tsunami" class="tsunami"></div>
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="ui-overlay">
+        <div class="mb-2">KHOA KHANG LỢI FISHING</div>
+        <div class="text-xl">VÀNG: <span id="money-display">0</span>G</div>
+        <div class="mt-4 flex flex-col gap-2">
+            <button class="btn" onclick="toggleModal('collection-book')">SỔ SƯU TẦM</button>
+            <button class="btn btn-shop" onclick="toggleModal('shop-modal')">TIỆM KHOA KHANG LỢI</button>
+        </div>
+    </div>
+
+    <div class="active-buffs" id="active-buffs"></div>
+
+    <div id="notification">ĐANG ĐỢI SINH VẬT...</div>
+    <div id="combo-container"></div>
+
+    <!-- Catch Modal -->
+    <div id="catch-modal">
+        <h2 class="text-lg mb-4 text-blue-600">BẮT ĐƯỢC RỒI!</h2>
+        <div id="catch-emoji" style="font-size: 64px;" class="mb-4">🐟</div>
+        <div id="catch-name" class="mb-2 text-sm">Cá Rô Phi</div>
+        <div id="catch-rarity" class="mb-4 text-xs font-bold">THƯỜNG</div>
+        <button class="btn" onclick="closeCatchModal()">NHẬN THƯỞNG</button>
+    </div>
+
+    <!-- Shop Modal -->
+    <div id="shop-modal" class="modal-custom">
+        <div class="flex justify-between items-center">
+            <h2 class="text-sm">TIỆM KHOA KHANG LỢI</h2>
+            <button class="btn" onclick="toggleModal('shop-modal')">ĐÓNG</button>
+        </div>
+        <div class="item-grid" id="shop-grid"></div>
+    </div>
+
+    <!-- Collection Modal -->
+    <div id="collection-book" class="modal-custom">
+        <div class="flex justify-between items-center">
+            <h2 class="text-sm">BỘ SƯU TẬP</h2>
+            <button class="btn" onclick="toggleModal('collection-book')">ĐÓNG</button>
+        </div>
+        <div class="fish-grid" id="fish-grid"></div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const moneyDisplay = document.getElementById('money-display');
+    const notification = document.getElementById('notification');
+    const catchModal = document.getElementById('catch-modal');
+    const comboContainer = document.getElementById('combo-container');
+    const tsunamiDiv = document.getElementById('tsunami');
+    const gameContainer = document.getElementById('game-container');
+    const activeBuffsDiv = document.getElementById('active-buffs');
+
+    let gameState = 'IDLE'; 
+    let money = parseInt(localStorage.getItem('kk_money_v2')) || 0;
+    let waterRipples = [];
+    let lightningBolts = []; 
+    let shadows = [];
+    let bobber = { x: 0, y: 0, active: false, targetFish: null, castTime: 0 };
+    let currentCombo = [];
+    let comboIndex = 0;
+    let caughtFish = JSON.parse(localStorage.getItem('kk_caught_v2')) || [];
+    let skyColor = '#aaddff';
+
+    // Buffs
+    let activeMoiCau = 0; 
+    let hasKhangVo = false;
+
+    const FISH_DATA = [
+        { id: 1, tier: 1, name: 'Cá Rô Phi', emoji: '🐟', price: 15, combo: '123' },
+        { id: 2, tier: 1, name: 'Cá Lóc Đồng', emoji: '🐡', price: 25, combo: '321' },
+        { id: 3, tier: 1, name: 'Cá Chép', emoji: '🐟', price: 20, combo: '112' },
+        { id: 4, tier: 2, name: 'Rùa Con', emoji: '🐢', price: 80, combo: '1322' },
+        { id: 5, tier: 2, name: 'Cá Sấu Baby', emoji: '🐊', price: 120, combo: '3123' },
+        { id: 6, tier: 2, name: 'Đôi Dép Rách', emoji: '🩴', price: 5, combo: '1111' },
+        { id: 7, tier: 3, name: 'Cá Mập Baby', emoji: '🦈', price: 400, combo: '123132' },
+        { id: 8, tier: 3, name: 'Rùa Phóng Xạ', emoji: '🐢', price: 600, combo: '332211' },
+        { id: 9, tier: 4, name: 'Sấu Hỏa Tiễn', emoji: '🐲', price: 1500, combo: '12321321' },
+        { id: 10, tier: 4, name: 'Mập Hoàng Kim', emoji: '🔱', price: 2200, combo: '32123123' },
+        { id: 11, tier: 5, name: 'Megalodon', emoji: '👹', price: 10000, combo: 'W1A2S3D1W' },
+        { id: 12, tier: 5, name: 'Ngừ Hạt Nhân', emoji: '☢️', price: 8500, combo: 'S3D2A1W3' },
+        { id: 13, tier: 5, name: 'Gấu Bắc Cực', emoji: '🐻', price: 15000, combo: 'A1W2S3D3A' }
+    ];
+
+    const TIERS = [
+        { id: 1, name: 'THƯỜNG', color: '#7f8c8d' },
+        { id: 2, name: 'BÌNH THƯỜNG', color: '#2980b9' },
+        { id: 3, name: 'HIẾM', color: '#8e44ad' },
+        { id: 4, name: 'RẤT HIẾM', color: '#f39c12' },
+        { id: 5, name: 'HUYỀN THOẠI', color: '#c0392b' }
+    ];
+
+    const SHOP_ITEMS = [
+        { id: 'm1', name: 'Mồi K H O A I', desc: '+10% Huyền thoại', price: 500, level: 1 },
+        { id: 'm2', name: 'Mồi K H O A II', desc: '+20% Huyền thoại', price: 1500, level: 2 },
+        { id: 'm3', name: 'Mồi K H O A III', desc: '+30% Huyền thoại', price: 4500, level: 3 },
+        { id: 'm4', name: 'Mồi K H O A IV', desc: '+40% Huyền thoại', price: 12000, level: 4 },
+        { id: 'kv', name: 'Bí Kiếp KHANGVO', desc: 'Tăng x5 GẤU BẮC CỰC', price: 8000 }
+    ];
+
+    function updateMoney(v) { 
+        money += v; 
+        moneyDisplay.innerText = money; 
+        localStorage.setItem('kk_money_v2', money); 
+    }
+    updateMoney(0);
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function triggerLightning() {
+        const startX = Math.random() * canvas.width;
+        let curX = startX, curY = 0;
+        const segs = [];
+        while(curY < canvas.height * 0.6) {
+            let nextX = curX + (Math.random()-0.5)*80;
+            let nextY = curY + Math.random()*40+20;
+            segs.push({x1: curX, y1: curY, x2: nextX, y2: nextY});
+            curX = nextX; curY = nextY;
+        }
+        lightningBolts.push({segs, opacity: 2});
+        gameContainer.style.background = '#fff';
+        setTimeout(() => gameContainer.style.background = skyColor, 60);
+    }
+
+    class FishShadow {
+        constructor() {
+            const roll = Math.random();
+            let tIdx = 0;
+            let t5C = 0.05 + (activeMoiCau * 0.1); 
+            let t4C = t5C + 0.1;
+            let t3C = t4C + 0.2;
+            let t2C = t3C + 0.25;
+
+            if(roll < t5C) tIdx = 4;
+            else if(roll < t4C) tIdx = 3;
+            else if(roll < t3C) tIdx = 2;
+            else if(roll < t2C) tIdx = 1;
+            else tIdx = 0;
+
+            this.tierId = tIdx + 1;
+            let list = FISH_DATA.filter(f => f.tier === this.tierId);
+            
+            if(this.tierId === 5 && hasKhangVo) {
+                this.fish = Math.random() < 0.7 ? FISH_DATA.find(f => f.id === 13) : list[Math.floor(Math.random()*list.length)];
+            } else {
+                this.fish = list[Math.floor(Math.random()*list.length)];
+            }
+
+            this.x = Math.random() < 0.5 ? -100 : canvas.width + 100;
+            this.y = canvas.height * 0.65 + Math.random() * (canvas.height * 0.3);
+            this.speed = (0.5 + Math.random() * 0.5) * (this.x < 0 ? 1 : -1);
+            this.state = 'SWIM';
+            this.dead = false;
+        }
+
+        update() {
+            if(this.state === 'SWIM') {
+                this.x += this.speed;
+                if(bobber.active && Math.hypot(this.x-bobber.x, this.y-bobber.y) < 150) this.state = 'CHASE';
+                if(this.x < -300 || this.x > canvas.width + 300) this.dead = true;
+            } else if(this.state === 'CHASE') {
+                this.x += (bobber.x - this.x) * 0.04;
+                this.y += (bobber.y - this.y) * 0.04;
+                if(Math.hypot(this.x-bobber.x, this.y-bobber.y) < 5) {
+                    this.state = 'BITE'; this.biteTime = Date.now();
+                }
+            } else if(this.state === 'BITE') {
+                if(Date.now() - this.biteTime > 500 && gameState === 'WAITING') {
+                    startHook(this.fish);
+                    this.dead = true;
+                }
+            }
+        }
+
+        draw() {
+            const size = 15 * (1 + (this.tierId-1)*0.4);
+            if(this.tierId === 5) {
+                ctx.fillStyle = `hsl(${(Date.now()/5)%360}, 100%, 60%)`;
+                ctx.shadowBlur = 15; ctx.shadowColor = ctx.fillStyle;
+            } else if(this.tierId === 4) {
+                ctx.fillStyle = '#f1c40f'; ctx.shadowBlur = 8; ctx.shadowColor = 'orange';
+            } else {
+                ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 0;
+            }
+            ctx.beginPath(); ctx.ellipse(this.x, this.y, size, size/2.5, 0, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    function startHook(fish) {
+        gameState = 'HOOKED';
+        bobber.targetFish = fish;
+        notification.innerHTML = `BÁM CHẶT!<br><span style="color:#f1c40f">${fish.name}</span>`;
+        notification.style.display = 'block';
+        currentCombo = fish.combo.split('');
+        comboIndex = 0;
+        comboContainer.innerHTML = ''; comboContainer.style.display = 'flex';
+        currentCombo.forEach(k => {
+            const d = document.createElement('div'); d.className = 'combo-key'; d.innerText = k;
+            comboContainer.appendChild(d);
+        });
+
+        if(fish.tier >= 4) {
+            skyColor = '#2c3e50'; gameContainer.style.background = skyColor;
+            lightningInt = setInterval(triggerLightning, 700);
+        }
+        if(fish.tier === 5) tsunamiDiv.style.height = '40%';
+    }
+
+    let lightningInt = null;
+
+    function resetGame() {
+        clearInterval(lightningInt);
+        tsunamiDiv.style.height = '0';
+        skyColor = '#aaddff'; 
+        gameContainer.style.background = skyColor;
+        comboContainer.style.display = 'none';
+        comboContainer.innerHTML = '';
+        gameState = 'IDLE'; 
+        bobber.active = false; 
+        bobber.targetFish = null;
+        shadows = [];
+        comboIndex = 0;
+    }
+
+    function success() {
+        const f = bobber.targetFish;
+        const fishEmoji = f.emoji;
+        const fishName = f.name;
+        const fishTier = f.tier;
+        const fishPrice = f.price;
+        const fishId = f.id;
+
+        resetGame();
+        
+        document.getElementById('catch-emoji').innerText = fishEmoji;
+        document.getElementById('catch-name').innerText = fishName;
+        document.getElementById('catch-rarity').innerText = TIERS[fishTier-1].name;
+        document.getElementById('catch-rarity').style.color = TIERS[fishTier-1].color;
+        catchModal.classList.add('show');
+        
+        updateMoney(fishPrice);
+        if(!caughtFish.includes(fishId)) {
+            caughtFish.push(fishId);
+            localStorage.setItem('kk_caught_v2', JSON.stringify(caughtFish));
+        }
+        notification.style.display = 'none';
+    }
+
+    function fail() {
+        resetGame();
+        notification.innerText = "SẨY RỒI!";
+        notification.style.display = 'block';
+        setTimeout(() => notification.style.display = 'none', 1500);
+    }
+
+    window.addEventListener('keydown', e => {
+        const key = e.key.toUpperCase();
+        
+        // SỬA LỖI: Khi nhấn Space để đổi bóng
+        if(e.code === 'Space') {
+            // Nếu đang trong quá trình chờ cá hoặc đang kéo combo
+            if(gameState === 'WAITING' || gameState === 'HOOKED') {
+                const oldX = bobber.x;
+                const oldY = bobber.y;
+                
+                resetGame(); // Reset triệt để trạng thái cũ
+                
+                // Thả một bóng mới ngay lập tức tại vị trí cũ
+                bobber = {x: oldX, y: oldY, active: true, castTime: Date.now()};
+                gameState = 'WAITING';
+                shadows = [new FishShadow()];
+                notification.innerText = "ĐỔI BÓNG!";
+                notification.style.display = 'block';
+                return;
+            }
+            // Nếu đã có sẵn bóng (mới thả ra nhưng chưa cắn)
+            if(shadows.length > 0) {
+                shadows = [new FishShadow()];
+                notification.innerText = "ĐỔI BÓNG!";
+                notification.style.display = 'block';
+                return;
+            }
+        }
+        
+        if(gameState !== 'HOOKED') return;
+        
+        if(key === currentCombo[comboIndex]) {
+            comboContainer.children[comboIndex].classList.add('active');
+            comboIndex++;
+            if(comboIndex >= currentCombo.length) success();
+        } else if(['1','2','3','W','A','S','D'].includes(key)) {
+            fail();
+        }
+    });
+
+    canvas.addEventListener('mousedown', e => {
+        if(gameState === 'IDLE' && e.clientY > canvas.height*0.6) {
+            bobber = {x: e.clientX, y: e.clientY, active: true, castTime: Date.now()};
+            gameState = 'WAITING';
+            notification.innerText = "ĐANG CHỜ SINH VẬT..."; notification.style.display = 'block';
+        }
+    });
+
+    function closeCatchModal() { catchModal.classList.remove('show'); }
+
+    function toggleModal(id) {
+        const m = document.getElementById(id);
+        const isOp = m.style.display === 'flex';
+        document.querySelectorAll('.modal-custom').forEach(x => x.style.display = 'none');
+        if(!isOp) {
+            m.style.display = 'flex';
+            if(id === 'shop-modal') renderShop();
+            if(id === 'collection-book') renderCollection();
+        }
+    }
+
+    function renderShop() {
+        const g = document.getElementById('shop-grid'); g.innerHTML = '';
+        SHOP_ITEMS.forEach(i => {
+            const has = (i.level && activeMoiCau >= i.level) || (!i.level && hasKhangVo);
+            g.innerHTML += `
+                <div class="item-card">
+                    <div class="font-bold">${i.name}</div>
+                    <div class="text-[6px] my-2">${i.desc}</div>
+                    <div class="mb-2 text-blue-900">${i.price}G</div>
+                    <button class="btn" onclick="buy('${i.id}')" ${has?'disabled':''}>${has?'ĐÃ CÓ':'MUA'}</button>
+                </div>
+            `;
+        });
+    }
+
+    function buy(id) {
+        const i = SHOP_ITEMS.find(x => x.id === id);
+        if(money >= i.price) {
+            updateMoney(-i.price);
+            if(i.level) activeMoiCau = i.level; else hasKhangVo = true;
+            renderShop(); updateBuffUI();
+        }
+    }
+
+    function updateBuffUI() {
+        activeBuffsDiv.innerHTML = (activeMoiCau ? `<div>Mồi KHOA Cấp ${activeMoiCau}</div>` : '') + (hasKhangVo ? `<div class="text-yellow-400">Bí Kiếp KHANGVO</div>` : '');
+    }
+
+    function renderCollection() {
+        const g = document.getElementById('fish-grid'); g.innerHTML = '';
+        FISH_DATA.forEach(f => {
+            const caught = caughtFish.includes(f.id);
+            g.innerHTML += `
+                <div class="fish-card rarity-${f.tier} ${caught?'':'locked'}">
+                    <div style="font-size:32px">${caught ? f.emoji : '❔'}</div>
+                    <div>
+                        <div class="fish-name">${f.name}</div>
+                        <div class="fish-rare-tag">${TIERS[f.tier-1].name}</div>
+                    </div>
+                    <div style="font-size:5px; opacity:0.7">${caught ? 'HOÀN THÀNH' : 'CHƯA CÓ'}</div>
+                </div>
+            `;
+        });
+    }
+
+    function drawPlayer(x, y, t) {
+        const b = Math.sin(t*0.003)*2;
+        const s = gameState === 'HOOKED' ? Math.sin(t*0.1)*4 : 0;
+        ctx.fillStyle = '#3e2723'; ctx.fillRect(x-15, y-15, 30, 15);
+        ctx.fillStyle = '#0d47a1'; ctx.fillRect(x-18, y-40+b, 36, 25);
+        ctx.fillStyle = '#ffe0b2'; ctx.fillRect(x-10, y-55+b, 20, 20);
+        ctx.fillStyle = '#fbc02d'; ctx.fillRect(x-22, y-58+b, 44, 8); ctx.fillRect(x-12, y-68+b, 24, 10);
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.beginPath();
+        ctx.moveTo(x+5, y-30+b+s);
+        const tx = x+65+s, ty = y-80+b+s;
+        ctx.lineTo(tx, ty); ctx.stroke();
+        return {tx, ty};
+    }
+
+    function loop(t) {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        const wl = canvas.height*0.6;
+        ctx.fillStyle = skyColor; ctx.fillRect(0,0,canvas.width,wl);
+        ctx.fillStyle = '#2ecc71'; ctx.fillRect(0,wl-50,canvas.width,50);
+        const rod = drawPlayer(canvas.width/2-50, wl-5, t);
+        
+        ctx.fillStyle = skyColor==='#aaddff'?'#3498db':'#1a5276'; ctx.fillRect(0,wl,canvas.width,canvas.height-wl);
+
+        if(Math.random()<0.015) waterRipples.push({x:Math.random()*canvas.width, y:wl+Math.random()*(canvas.height-wl), r:10, a:0.6});
+        waterRipples.forEach((r,i) => {
+            r.r += 0.3; r.a -= 0.01; ctx.strokeStyle=`rgba(255,255,255,${r.a})`; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.ellipse(r.x, r.y, r.r, r.r/3, 0, 0, Math.PI*2); ctx.stroke();
+            if(r.a<=0) waterRipples.splice(i,1);
+        });
+
+        lightningBolts.forEach((l,i) => {
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.globalAlpha = l.opacity/2;
+            ctx.beginPath(); l.segs.forEach(s => { ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); }); ctx.stroke();
+            l.opacity -= 0.12; if(l.opacity<=0) lightningBolts.splice(i,1);
+        });
+        ctx.globalAlpha = 1;
+
+        if(shadows.length === 0 && Math.random() < 0.02) shadows.push(new FishShadow());
+        shadows = shadows.filter(s => !s.dead);
+        shadows.forEach(s => { s.update(); s.draw(); });
+
+        if(bobber.active) {
+            const off = gameState==='HOOKED'?Math.sin(t*0.12)*8 : Math.sin(t*0.002)*4;
+            ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(rod.tx, rod.ty); ctx.lineTo(bobber.x, bobber.y+off); ctx.stroke();
+            ctx.fillStyle = '#e74c3c'; ctx.fillRect(bobber.x-6, bobber.y-12+off, 12, 12);
+        }
+        requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+</script>
+</body>
+</html>
